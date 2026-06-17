@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Qamar — Kunlik hisobot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+:root{
+  --bg:#EEF1F8;--surface:#fff;--surface-2:#F6F7FB;--ink:#14161D;--muted:#6A7180;
+  --line:#E6E9F2;--primary:#5566F2;--primary-soft:#ECEEFE;--accent:#F4A63B;
+  --success:#16A36B;--success-soft:#E3F6EE;--danger:#E5484D;--danger-soft:#FCEBEC;
+  --shadow:0 1px 2px rgba(20,22,29,.05),0 10px 28px rgba(20,22,29,.05);--r:16px;
+}
+body.dark{
+  --bg:#0E1016;--surface:#171A22;--surface-2:#1F2330;--ink:#ECEEF4;--muted:#9098A8;
+  --line:#2A2F3D;--primary:#6E7DF6;--primary-soft:#21253A;--success:#2BB57E;
+  --success-soft:#14241C;--danger:#F0595E;--danger-soft:#2A1719;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.35);
+}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+#app{max-width:540px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:#fff;background:radial-gradient(120% 120% at 30% 20%,#8E9BFF,var(--primary));box-shadow:0 4px 14px rgba(85,102,242,.4)}
+.brand b{display:block;font-size:16px;letter-spacing:.5px;line-height:1.1}
+.brand small{color:var(--muted);font-size:11px}
+.today-chip{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);background:var(--surface-2);padding:6px 10px;border-radius:999px;border:1px solid var(--line)}
+.content{flex:1;padding:16px 16px 88px}
+.view{display:flex;flex-direction:column;gap:12px;animation:rise .3s ease}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.loading,.center{text-align:center;color:var(--muted);padding:40px 16px;font-size:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--shadow)}
+.card-head{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;margin-bottom:10px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.d1{background:var(--primary)}.d2{background:var(--accent)}.d3{background:var(--danger)}.d4{background:var(--success)}.d5{background:#9B6BF2}
+.opt{font-weight:400;color:var(--muted);font-size:12px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+.field-label{font-size:12px;color:var(--muted);font-weight:500}
+.inp{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px 12px;font-size:15px;color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s;font-family:inherit}
+.inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.area{resize:vertical;line-height:1.45;min-height:64px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.select-wrap{position:relative}
+select.inp{appearance:none;-webkit-appearance:none;padding-right:34px;cursor:pointer}
+.select-chev{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.progress-wrap{margin-top:12px}
+.progress-track{height:8px;background:var(--surface-2);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+.progress-fill{height:100%;border-radius:999px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.good .progress-fill{background:var(--success)}.mid .progress-fill{background:var(--accent)}.low .progress-fill{background:var(--danger)}
+.progress-label{display:block;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600}
+.banner{display:flex;align-items:center;gap:8px;background:var(--success-soft);color:var(--success);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:500}
+.err{display:flex;align-items:center;gap:8px;background:var(--danger-soft);color:var(--danger);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:500}
+.primary-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;background:var(--primary);color:#fff;font-size:15px;font-weight:600;padding:14px;border-radius:13px;cursor:pointer;box-shadow:0 6px 18px rgba(85,102,242,.35);transition:transform .12s,opacity .2s;font-family:inherit}
+.primary-btn:active{transform:scale(.98)}.primary-btn:disabled{opacity:.7}
+.hint{text-align:center;font-size:11.5px;color:var(--muted)}
+.date-bar{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:8px 12px;color:var(--muted);box-shadow:var(--shadow)}
+.date-inp{flex:1;border:none;background:transparent;font-size:14px;color:var(--ink);outline:none;font-family:inherit}
+.ghost-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);font-size:13px;font-weight:600;padding:9px 12px;border-radius:10px;cursor:pointer;font-family:inherit}
+.ghost-btn.wide{width:100%}.ghost-btn:active{transform:scale(.98)}
+.summary{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.moon{position:relative;width:84px;height:84px;flex:none}
+.moon-track{fill:none;stroke:var(--surface-2);stroke-width:7}
+.moon-fill{fill:none;stroke:var(--primary);stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1);filter:drop-shadow(0 0 4px rgba(85,102,242,.5))}
+.moon-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--primary)}
+.moon-center b{font-size:17px;color:var(--ink)}
+.stats{display:flex;gap:8px;flex:1}
+.stat{flex:1;text-align:center;background:var(--surface-2);border-radius:12px;padding:10px 4px}
+.stat b{display:block;font-size:19px;font-weight:700}.stat span{font-size:10.5px;color:var(--muted)}
+.stat.warn b{color:var(--danger)}
+.missing{background:var(--danger-soft);border-radius:var(--r);padding:12px 14px}
+.missing-head{display:flex;align-items:center;gap:7px;color:var(--danger);font-weight:600;font-size:13px;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip-red{background:var(--surface);color:var(--danger);border:1px solid var(--danger);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:500}
+.report-list{display:flex;flex-direction:column;gap:8px}
+.report{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.report.open{border-color:var(--primary)}
+.report-top{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;padding:13px 14px;cursor:pointer;text-align:left;color:inherit;font-family:inherit}
+.report-id{display:flex;flex-direction:column;gap:2px}
+.report-dept{font-weight:600;font-size:14.5px}.report-name{font-size:12px;color:var(--muted)}
+.report-meta{display:flex;align-items:center;gap:8px}
+.pbadge{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px}
+.pbadge.good{background:var(--success-soft);color:var(--success)}
+.pbadge.mid{background:#FCF1E0;color:#B9791C}
+body.dark .pbadge.mid{background:#2A2113;color:var(--accent)}
+.pbadge.low{background:var(--danger-soft);color:var(--danger)}
+.idot{width:8px;height:8px;border-radius:50%;background:var(--danger)}
+.chev{color:var(--muted);transition:transform .2s}
+.report.open .chev{transform:rotate(180deg)}
+.report-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.detail{background:var(--surface-2);border-radius:10px;padding:9px 11px}
+.detail.warn{background:var(--danger-soft)}
+.detail-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.detail.warn .detail-label{color:var(--danger)}
+.detail p{margin-top:3px;font-size:14px;line-height:1.45;white-space:pre-wrap}
+.empty{display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--muted);padding:36px 16px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r)}
+.tabbar{position:fixed;bottom:0;left:0;right:0;max-width:540px;margin:0 auto;display:flex;background:var(--surface);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;padding:6px;cursor:pointer;border-radius:12px;font-family:inherit;transition:color .15s}
+.tabbar button.on{color:var(--primary)}
+svg{display:block}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">Yuklanmoqda…</div></div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+const MONTHS = ["yanvar","fevral","mart","aprel","may","iyun","iyul","avgust","sentabr","oktabr","noyabr","dekabr"];
+const SVG = {
+  moon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
+  cal:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  chev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  send:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>',
+  check:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  warn:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  ok:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.8 10A10 10 0 1 1 17 3.3"/><path d="M22 4 12 14.5l-3-3"/></svg>',
+  copy:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  inbox:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/></svg>',
+  list:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  dash:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
+};
+function todayStr(){const d=new Date(),p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
+function prettyDate(s){const[y,m,d]=s.split("-").map(Number);return `${d}-${MONTHS[m-1]}, ${y}`;}
+function pct(r,f){r=Number(r);f=Number(f);if(!r||r<=0)return null;return Math.round((f/r)*100);}
+function cls(p){return p>=100?"good":p>=70?"mid":"low";}
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function haptic(t){try{const h=tg?.HapticFeedback;if(!h)return;["success","error","warning"].includes(t)?h.notificationOccurred(t):h.impactOccurred(t||"light");}catch(e){}}
+
+async function api(path, opts={}){
+  const res = await fetch(path, {
+    ...opts,
+    headers:{ "Content-Type":"application/json", "x-init-data": tg?.initData || "", ...(opts.headers||{}) },
+  });
+  if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.error||("Xatolik "+res.status)); }
+  return res.json();
+}
+
+const state = { tab:"submit", me:null, isAdmin:false, depts:[], date:todayStr(), open:null };
+
+/* ------------------------------- init ------------------------------- */
+(async function init(){
+  if(tg){ try{tg.ready();tg.expand();tg.setHeaderColor?.("secondary_bg_color");}catch(e){} if(tg.colorScheme==="dark")document.body.classList.add("dark"); }
+  else if(window.matchMedia?.("(prefers-color-scheme: dark)").matches){ document.body.classList.add("dark"); }
+  try{
+    const me = await api("/api/me");
+    state.me = me.user; state.isAdmin = me.isAdmin; state.lastDept = me.lastDept;
+    const d = await api("/api/departments"); state.depts = d.departments;
+    render();
+  }catch(e){
+    document.getElementById("app").innerHTML =
+      `<div class="center"><p>Ilovani <b>Telegram</b> orqali oching.</p><p style="margin-top:8px;font-size:12px">${esc(e.message)}</p></div>`;
+  }
+})();
+
+/* ------------------------------- render ----------------------------- */
+function render(){
+  const app=document.getElementById("app");
+  app.innerHTML = `
+    <header class="topbar">
+      <div class="brand"><span class="logo">${SVG.moon}</span>
+        <div><b>Qamar</b><small>Kunlik hisobot tizimi</small></div></div>
+      <div class="today-chip">${SVG.cal} ${prettyDate(todayStr())}</div>
+    </header>
+    <main class="content" id="content"></main>
+    <nav class="tabbar">
+      <button data-tab="submit" class="${state.tab==="submit"?"on":""}">${SVG.list}<span>Hisobot</span></button>
+      ${state.isAdmin?`<button data-tab="admin" class="${state.tab==="admin"?"on":""}">${SVG.dash}<span>Admin panel</span></button>`:""}
+    </nav>`;
+  app.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;state.open=null;haptic("light");render();});
+  state.tab==="admin"&&state.isAdmin ? renderAdmin() : renderSubmit();
+}
+
+/* ------------------------------- submit ----------------------------- */
+let form={tasks:"",orders:"",topCat:"",top20:"",outStock:"",note:""};
+async function renderSubmit(){
+  const c=document.getElementById("content");
+  const date=todayStr();
+  let existing=false;
+  try{ const r=await api("/api/report?date="+date); if(r.report){const x=r.report;form={tasks:x.tasks||"",orders:x.orders||"",topCat:x.topCat||"",top20:x.top20||"",outStock:x.outStock||"",note:x.note||""};existing=true;state.lastDept=x.deptId;} }catch(e){}
+  const deptOpts=state.depts.map(d=>`<option value="${d.id}" ${state.lastDept===d.id?"selected":""}>${esc(d.name)}</option>`).join("");
+  c.innerHTML=`<div class="view">
+    <div class="card">
+      <label class="field"><span class="field-label">Bo‘lim rahbari</span>
+        <input class="inp" id="f-name" value="${esc(state.me?.name||"")}" placeholder="Ismingiz"/></label>
+      <label class="field"><span class="field-label">Bo‘lim</span>
+        <div class="select-wrap"><select class="inp" id="f-dept"><option value="" ${!state.lastDept?"selected":""} disabled>Bo‘limni tanlang</option>${deptOpts}</select><span class="select-chev">${SVG.chev}</span></div></label>
+    </div>
+    ${existing?`<div class="banner">${SVG.ok} Bugun uchun hisobotingiz bor — tahrirlab, qayta saqlashingiz mumkin.</div>`:""}
+    <div class="card"><div class="card-head"><span class="dot d1"></span> Kunlik bajarilgan ishlar</div>
+      <textarea class="inp area" id="f-tasks" rows="4" placeholder="Bajarilgan vazifalar va holati. Masalan:&#10;• Kunlik sotuv analizlari — bajarildi&#10;• Haftalik buyurtmalar — jarayonda">${esc(form.tasks)}</textarea></div>
+    <div class="card"><div class="card-head"><span class="dot d2"></span> Buyurtmalar hisoboti</div>
+      <textarea class="inp area" id="f-orders" rows="3" placeholder="Ta‘minotchi · summa · holati (Keldi / yo‘lda). Masalan:&#10;• Akademnashr — 4 320 000 — keldi">${esc(form.orders)}</textarea></div>
+    <div class="card"><div class="card-head"><span class="dot d4"></span> TOP kategoriyalar</div>
+      <textarea class="inp area" id="f-topCat" rows="3" placeholder="Eng ko‘p sotilgan kategoriyalar va savdo soni">${esc(form.topCat)}</textarea></div>
+    <div class="card"><div class="card-head"><span class="dot d5"></span> Kunlik TOP mahsulotlar</div>
+      <textarea class="inp area" id="f-top20" rows="3" placeholder="Kunlik TOP mahsulotlar (do‘kon bo‘yicha bo‘lsa, ko‘rsating)">${esc(form.top20)}</textarea></div>
+    <div class="card"><div class="card-head"><span class="dot d3"></span> Qolmagan / kam qolgan mahsulotlar</div>
+      <textarea class="inp area" id="f-outStock" rows="3" placeholder="Tugagan yoki kam qolgan mahsulotlar, qoldiq va qaror">${esc(form.outStock)}</textarea></div>
+    <div class="card"><div class="card-head"><span class="dot d2"></span> Izoh / muammolar <span class="opt">(ixtiyoriy)</span></div>
+      <textarea class="inp area" id="f-note" rows="2" placeholder="Qo‘shimcha izoh yoki to‘siqlar">${esc(form.note)}</textarea></div>
+    <div id="submit-err"></div>
+    <button class="primary-btn" id="submit-btn">${SVG.send} ${existing?"Hisobotni yangilash":"Hisobotni yuborish"}</button>
+    <p class="hint">Hisobotlar markaziy tizimda saqlanadi.</p>
+  </div>`;
+
+  document.getElementById("submit-btn").onclick=async()=>{
+    const name=document.getElementById("f-name").value.trim();
+    const deptId=document.getElementById("f-dept").value;
+    const tasks=document.getElementById("f-tasks").value.trim();
+    const errBox=document.getElementById("submit-err");
+    const fail=m=>{errBox.innerHTML=`<div class="err">${SVG.warn} ${m}</div>`;haptic("error");};
+    if(!name)return fail("Ismingizni kiriting.");
+    if(!deptId)return fail("Bo‘limni tanlang.");
+    if(!tasks)return fail("«Kunlik bajarilgan ishlar» bo‘sh bo‘lmasligi kerak.");
+    errBox.innerHTML="";
+    const btn=document.getElementById("submit-btn");btn.disabled=true;
+    try{
+      await api("/api/report",{method:"POST",body:JSON.stringify({date,deptId,tasks,
+        orders:document.getElementById("f-orders").value,
+        topCat:document.getElementById("f-topCat").value,
+        top20:document.getElementById("f-top20").value,
+        outStock:document.getElementById("f-outStock").value,
+        note:document.getElementById("f-note").value})});
+      haptic("success");
+      btn.innerHTML=`${SVG.check} Saqlandi`;
+      setTimeout(()=>renderSubmit(),1400);
+    }catch(e){btn.disabled=false;fail(e.message);}
+  };
+}
+
+/* -------------------------------- admin ----------------------------- */
+async function renderAdmin(){
+  const c=document.getElementById("content");
+  c.innerHTML=`<div class="view"><div class="loading">Yuklanmoqda…</div></div>`;
+  let data;
+  try{ data=await api("/api/admin/reports?date="+state.date); }
+  catch(e){ c.innerHTML=`<div class="center">${esc(e.message)}</div>`; return; }
+  const {reports,departments,missing}=data;
+  const nameOf=id=>departments.find(d=>d.id===id)?.name||id;
+  const submittedCount=departments.length-missing.length;
+  const ratio=departments.length?submittedCount/departments.length:0;
+  const ordersN=reports.filter(r=>(r.orders||"").trim()).length;
+  const stockN=reports.filter(r=>(r.outStock||"").trim()).length;
+  const R=34,C=2*Math.PI*R,off=C*(1-ratio);
+
+  c.innerHTML=`<div class="view">
+    <div class="date-bar">${SVG.cal}<input class="date-inp" type="date" id="a-date" value="${state.date}"/></div>
+    <div class="summary">
+      <div class="moon"><svg width="84" height="84" viewBox="0 0 84 84">
+        <circle cx="42" cy="42" r="${R}" class="moon-track"></circle>
+        <circle cx="42" cy="42" r="${R}" class="moon-fill" stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 42 42)"></circle></svg>
+        <div class="moon-center">${SVG.moon}<b>${Math.round(ratio*100)}%</b></div></div>
+      <div class="stats">
+        <div class="stat"><b>${submittedCount}/${departments.length}</b><span>Topshirdi</span></div>
+        <div class="stat"><b>${ordersN}</b><span>Buyurtma</span></div>
+        <div class="stat ${stockN?"warn":""}"><b>${stockN}</b><span>Qoldiq ogohi</span></div>
+      </div></div>
+    ${missing.length?`<div class="missing"><div class="missing-head">${SVG.warn} Topshirmaganlar (${missing.length})</div><div class="chips">${missing.map(d=>`<span class="chip-red">${esc(d.name)}</span>`).join("")}</div></div>`:""}
+    ${reports.length?`<button class="ghost-btn wide" id="copy-btn">${SVG.copy} Kunlik xulosani nusxalash</button>`:""}
+    <div id="rlist"></div>
+  </div>`;
+
+  document.getElementById("a-date").onchange=e=>{state.date=e.target.value;state.open=null;renderAdmin();};
+
+  const list=document.getElementById("rlist");
+  if(!reports.length){
+    list.innerHTML=`<div class="empty">${SVG.inbox}<p>Bu kun uchun hali hisobot yo‘q.</p></div>`;
+  }else{
+    list.className="report-list";
+    list.innerHTML=reports.map(r=>{
+      const o=state.open===r.deptId, alert=(r.outStock||"").trim()||(r.note||"").trim();
+      return `<div class="report ${o?"open":""}">
+        <button class="report-top" data-d="${r.deptId}">
+          <div class="report-id"><span class="report-dept">${esc(nameOf(r.deptId))}</span><span class="report-name">${esc(r.name)}</span></div>
+          <div class="report-meta">${alert?`<span class="idot"></span>`:""}<span class="chev">${SVG.chev}</span></div>
+        </button>
+        ${o?`<div class="report-body">
+          ${detail("Kunlik bajarilgan ishlar",r.tasks)}
+          ${(r.orders||"").trim()?detail("Buyurtmalar hisoboti",r.orders):""}
+          ${(r.topCat||"").trim()?detail("TOP kategoriyalar",r.topCat):""}
+          ${(r.top20||"").trim()?detail("Kunlik TOP mahsulotlar",r.top20):""}
+          ${(r.outStock||"").trim()?detail("Qolmagan / kam qolgan",r.outStock,true):""}
+          ${(r.note||"").trim()?detail("Izoh / muammolar",r.note):""}
+        </div>`:""}
+      </div>`;
+    }).join("");
+    list.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{state.open=state.open===b.dataset.d?null:b.dataset.d;haptic("light");renderAdmin();});
+  }
+
+  const copyBtn=document.getElementById("copy-btn");
+  if(copyBtn)copyBtn.onclick=async()=>{
+    let t=`📋 Qamar — kunlik hisobot\n${prettyDate(state.date)}\nTopshirdi: ${submittedCount}/${departments.length}\n\n`;
+    reports.forEach(r=>{
+      t+=`▪️ ${nameOf(r.deptId)} — ${r.name}\n   Bajarilgan: ${r.tasks||"—"}\n`;
+      if((r.orders||"").trim())t+=`   Buyurtmalar: ${r.orders}\n`;
+      if((r.topCat||"").trim())t+=`   TOP kategoriya: ${r.topCat}\n`;
+      if((r.top20||"").trim())t+=`   TOP mahsulot: ${r.top20}\n`;
+      if((r.outStock||"").trim())t+=`   ⚠️ Qolmagan: ${r.outStock}\n`;
+      if((r.note||"").trim())t+=`   📝 Izoh: ${r.note}\n`;
+      t+="\n";});
+    if(missing.length)t+=`❗️ Topshirmaganlar: ${missing.map(d=>d.name).join(", ")}`;
+    try{await navigator.clipboard.writeText(t.trim());copyBtn.innerHTML=`${SVG.check} Nusxa olindi`;haptic("success");setTimeout(()=>copyBtn.innerHTML=`${SVG.copy} Kunlik xulosani nusxalash`,1800);}catch(e){haptic("error");}
+  };
+}
+function detail(label,v,warn){return `<div class="detail ${warn?"warn":""}"><span class="detail-label">${esc(label)}</span><p>${esc(v)}</p></div>`;}
+</script>
+</body>
+</html>
