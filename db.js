@@ -11,7 +11,7 @@ const DEFAULT_DEPTS = [
   { id: "moliya", name: "Moliya" },
   { id: "ombor", name: "Ombor" },
   { id: "hr", name: "HR" },
-  { id: "it", name: "IT" },
+  { id: "taminot", name: "Ta‘minot" },
   { id: "ishlab", name: "Ishlab chiqarish" },
   { id: "logistika", name: "Logistika" },
 ];

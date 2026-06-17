@@ -1,8 +1,8 @@
 # 🌙 Qamar — Kunlik hisobot Telegram ilovasi
 
 Bo‘lim rahbarlari har kuni hisobot topshiradigan Telegram bot + mini-ilova.
-To‘rt maydon: **Bajarilgan ishlar**, **Reja vs Fakt**, **Muammolar**, **Ertangi reja**.
-Administrator uchun barcha hisobotlarni ko‘radigan **admin panel** (kim topshirgan/topshirmagan, o‘rtacha bajarilish, kunlik xulosani nusxalash).
+Hisobot bo‘limlari Excel kunlik hisobotiga mos: **Kunlik bajarilgan ishlar**, **Buyurtmalar hisoboti**, **TOP kategoriyalar**, **Kunlik TOP mahsulotlar**, **Qolmagan / kam qolgan mahsulotlar** (va ixtiyoriy **Izoh / muammolar**).
+Administrator uchun barcha hisobotlarni ko‘radigan **admin panel** (kim topshirgan/topshirmagan, buyurtmalar soni, qoldiq ogohlantirishlari, kunlik xulosani nusxalash).
 
 ---
 

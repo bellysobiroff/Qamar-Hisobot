@@ -82,14 +82,20 @@ app.get("/api/report", auth, (req, res) => {
 });
 
 app.post("/api/report", auth, (req, res) => {
-  const { date, deptId, done, reja, fakt, unit, issues, tomorrow } = req.body;
-  if (!date || !deptId || !done?.trim())
-    return res.status(400).json({ error: "Sana, bo‘lim va «Bajarilgan ishlar» majburiy." });
+  const { date, deptId, tasks, orders, topCat, top20, outStock, note } = req.body;
+  if (!date || !deptId || !tasks?.trim())
+    return res.status(400).json({ error: "Sana, bo‘lim va «Kunlik bajarilgan ishlar» majburiy." });
   db.setUserDept(req.user.id, deptId);
   const report = {
     userId: String(req.user.id),
     name: [req.user.first_name, req.user.last_name].filter(Boolean).join(" ") || "—",
-    deptId, done: done.trim(), reja, fakt, unit, issues, tomorrow,
+    deptId,
+    tasks: tasks.trim(),
+    orders: (orders || "").trim(),
+    topCat: (topCat || "").trim(),
+    top20: (top20 || "").trim(),
+    outStock: (outStock || "").trim(),
+    note: (note || "").trim(),
     date, submittedAt: new Date().toISOString(),
   };
   db.saveReport(date, req.user.id, report);
