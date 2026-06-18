@@ -138,7 +138,11 @@ async function api(path, opts={}){
   return res.json();
 }
 
-const state = { tab:"submit", me:null, isAdmin:false, depts:[], date:todayStr(), open:null };
+const state = { tab:"submit", me:null, isAdmin:false, depts:[], forms:{}, date:todayStr(), open:null };
+
+// Bo'lim uchun maydonlar (topilmasa — standart)
+function fieldsFor(deptId){ return (state.forms&&state.forms[deptId]) || (state.forms&&state.forms._default) || []; }
+const DOTS=["d1","d2","d4","d5","d3"];
 
 /* ------------------------------- init ------------------------------- */
 (async function init(){
@@ -148,6 +152,7 @@ const state = { tab:"submit", me:null, isAdmin:false, depts:[], date:todayStr(),
     const me = await api("/api/me");
     state.me = me.user; state.isAdmin = me.isAdmin; state.lastDept = me.lastDept;
     const d = await api("/api/departments"); state.depts = d.departments;
+    const f = await api("/api/forms"); state.forms = f.forms;
     render();
   }catch(e){
     document.getElementById("app").innerHTML =
@@ -174,56 +179,70 @@ function render(){
 }
 
 /* ------------------------------- submit ----------------------------- */
-let form={tasks:"",orders:"",topCat:"",top20:"",outStock:"",note:""};
+let answers={};          // {fieldId: value} — kiritilgan javoblar
+let selDept="";          // tanlangan bo'lim id
 async function renderSubmit(){
   const c=document.getElementById("content");
   const date=todayStr();
   let existing=false;
-  try{ const r=await api("/api/report?date="+date); if(r.report){const x=r.report;form={tasks:x.tasks||"",orders:x.orders||"",topCat:x.topCat||"",top20:x.top20||"",outStock:x.outStock||"",note:x.note||""};existing=true;state.lastDept=x.deptId;} }catch(e){}
-  const deptOpts=state.depts.map(d=>`<option value="${d.id}" ${state.lastDept===d.id?"selected":""}>${esc(d.name)}</option>`).join("");
+  answers={}; selDept=state.lastDept||"";
+  try{
+    const r=await api("/api/report?date="+date);
+    if(r.report){ const x=r.report; selDept=x.deptId||selDept; answers={...(x.answers||{})}; existing=true; }
+  }catch(e){}
+  const deptOpts=state.depts.map(d=>`<option value="${d.id}" ${selDept===d.id?"selected":""}>${esc(d.name)}</option>`).join("");
   c.innerHTML=`<div class="view">
     <div class="card">
       <label class="field"><span class="field-label">Bo‘lim rahbari</span>
         <input class="inp" id="f-name" value="${esc(state.me?.name||"")}" placeholder="Ismingiz"/></label>
       <label class="field"><span class="field-label">Bo‘lim</span>
-        <div class="select-wrap"><select class="inp" id="f-dept"><option value="" ${!state.lastDept?"selected":""} disabled>Bo‘limni tanlang</option>${deptOpts}</select><span class="select-chev">${SVG.chev}</span></div></label>
+        <div class="select-wrap"><select class="inp" id="f-dept"><option value="" ${!selDept?"selected":""} disabled>Bo‘limni tanlang</option>${deptOpts}</select><span class="select-chev">${SVG.chev}</span></div></label>
     </div>
     ${existing?`<div class="banner">${SVG.ok} Bugun uchun hisobotingiz bor — tahrirlab, qayta saqlashingiz mumkin.</div>`:""}
-    <div class="card"><div class="card-head"><span class="dot d1"></span> Kunlik bajarilgan ishlar</div>
-      <textarea class="inp area" id="f-tasks" rows="4" placeholder="Bajarilgan vazifalar va holati. Masalan:&#10;• Kunlik sotuv analizlari — bajarildi&#10;• Haftalik buyurtmalar — jarayonda">${esc(form.tasks)}</textarea></div>
-    <div class="card"><div class="card-head"><span class="dot d2"></span> Buyurtmalar hisoboti</div>
-      <textarea class="inp area" id="f-orders" rows="3" placeholder="Ta‘minotchi · summa · holati (Keldi / yo‘lda). Masalan:&#10;• Akademnashr — 4 320 000 — keldi">${esc(form.orders)}</textarea></div>
-    <div class="card"><div class="card-head"><span class="dot d4"></span> TOP kategoriyalar</div>
-      <textarea class="inp area" id="f-topCat" rows="3" placeholder="Eng ko‘p sotilgan kategoriyalar va savdo soni">${esc(form.topCat)}</textarea></div>
-    <div class="card"><div class="card-head"><span class="dot d5"></span> Kunlik TOP mahsulotlar</div>
-      <textarea class="inp area" id="f-top20" rows="3" placeholder="Kunlik TOP mahsulotlar (do‘kon bo‘yicha bo‘lsa, ko‘rsating)">${esc(form.top20)}</textarea></div>
-    <div class="card"><div class="card-head"><span class="dot d3"></span> Qolmagan / kam qolgan mahsulotlar</div>
-      <textarea class="inp area" id="f-outStock" rows="3" placeholder="Tugagan yoki kam qolgan mahsulotlar, qoldiq va qaror">${esc(form.outStock)}</textarea></div>
-    <div class="card"><div class="card-head"><span class="dot d2"></span> Izoh / muammolar <span class="opt">(ixtiyoriy)</span></div>
-      <textarea class="inp area" id="f-note" rows="2" placeholder="Qo‘shimcha izoh yoki to‘siqlar">${esc(form.note)}</textarea></div>
+    <div id="fields"></div>
     <div id="submit-err"></div>
     <button class="primary-btn" id="submit-btn">${SVG.send} ${existing?"Hisobotni yangilash":"Hisobotni yuborish"}</button>
     <p class="hint">Hisobotlar markaziy tizimda saqlanadi.</p>
   </div>`;
 
+  // Maydonlarni tanlangan bo'limga qarab chizish
+  function paintFields(){
+    const box=document.getElementById("fields");
+    if(!selDept){ box.innerHTML=`<div class="empty">${SVG.inbox}<p>Avval bo‘limni tanlang.</p></div>`; return; }
+    const fields=fieldsFor(selDept);
+    box.innerHTML=fields.map((f,i)=>{
+      const dot=DOTS[i%DOTS.length], val=esc(answers[f.id]||"");
+      const opt=f.optional?` <span class="opt">(ixtiyoriy)</span>`:"";
+      return `<div class="card"><div class="card-head"><span class="dot ${dot}"></span> ${esc(f.label)}${opt}</div>
+        <textarea class="inp area" id="f-${f.id}" rows="${f.rows||3}" placeholder="${esc(f.ph||"")}">${val}</textarea></div>`;
+    }).join("");
+    // kiritilgan qiymatlarni answers'ga yozib borish
+    fields.forEach(f=>{
+      const el=document.getElementById("f-"+f.id);
+      if(el) el.addEventListener("input",()=>{answers[f.id]=el.value;});
+    });
+  }
+  paintFields();
+
+  document.getElementById("f-dept").onchange=e=>{
+    selDept=e.target.value; state.lastDept=selDept; haptic("light"); paintFields();
+  };
+
   document.getElementById("submit-btn").onclick=async()=>{
     const name=document.getElementById("f-name").value.trim();
-    const deptId=document.getElementById("f-dept").value;
-    const tasks=document.getElementById("f-tasks").value.trim();
     const errBox=document.getElementById("submit-err");
     const fail=m=>{errBox.innerHTML=`<div class="err">${SVG.warn} ${m}</div>`;haptic("error");};
     if(!name)return fail("Ismingizni kiriting.");
-    if(!deptId)return fail("Bo‘limni tanlang.");
-    if(!tasks)return fail("«Kunlik bajarilgan ishlar» bo‘sh bo‘lmasligi kerak.");
+    if(!selDept)return fail("Bo‘limni tanlang.");
+    const fields=fieldsFor(selDept);
+    const payload={};
+    fields.forEach(f=>{ payload[f.id]=(document.getElementById("f-"+f.id)?.value||"").trim(); });
+    const reqMiss=fields.find(f=>f.required&&!payload[f.id]);
+    if(reqMiss)return fail(`«${reqMiss.label}» bo‘sh bo‘lmasligi kerak.`);
     errBox.innerHTML="";
     const btn=document.getElementById("submit-btn");btn.disabled=true;
     try{
-      await api("/api/report",{method:"POST",body:JSON.stringify({date,deptId,tasks,
-        orders:document.getElementById("f-orders").value,
-        topCat:document.getElementById("f-topCat").value,
-        top20:document.getElementById("f-top20").value,
-        outStock:document.getElementById("f-outStock").value,
-        note:document.getElementById("f-note").value})});
+      await api("/api/report",{method:"POST",body:JSON.stringify({date,deptId:selDept,answers:payload})});
       haptic("success");
       btn.innerHTML=`${SVG.check} Saqlandi`;
       setTimeout(()=>renderSubmit(),1400);
@@ -242,8 +261,9 @@ async function renderAdmin(){
   const nameOf=id=>departments.find(d=>d.id===id)?.name||id;
   const submittedCount=departments.length-missing.length;
   const ratio=departments.length?submittedCount/departments.length:0;
-  const ordersN=reports.filter(r=>(r.orders||"").trim()).length;
-  const stockN=reports.filter(r=>(r.outStock||"").trim()).length;
+  // ogohlantirish: biror "warn" maydoni to'ldirilgan hisobotlar soni
+  const hasWarn=r=>fieldsFor(r.deptId).some(f=>f.warn&&((r.answers||{})[f.id]||"").trim());
+  const warnN=reports.filter(hasWarn).length;
   const R=34,C=2*Math.PI*R,off=C*(1-ratio);
 
   c.innerHTML=`<div class="view">
@@ -255,8 +275,8 @@ async function renderAdmin(){
         <div class="moon-center">${SVG.moon}<b>${Math.round(ratio*100)}%</b></div></div>
       <div class="stats">
         <div class="stat"><b>${submittedCount}/${departments.length}</b><span>Topshirdi</span></div>
-        <div class="stat"><b>${ordersN}</b><span>Buyurtma</span></div>
-        <div class="stat ${stockN?"warn":""}"><b>${stockN}</b><span>Qoldiq ogohi</span></div>
+        <div class="stat"><b>${missing.length}</b><span>Topshirmadi</span></div>
+        <div class="stat ${warnN?"warn":""}"><b>${warnN}</b><span>Ogohlantirish</span></div>
       </div></div>
     ${missing.length?`<div class="missing"><div class="missing-head">${SVG.warn} Topshirmaganlar (${missing.length})</div><div class="chips">${missing.map(d=>`<span class="chip-red">${esc(d.name)}</span>`).join("")}</div></div>`:""}
     ${reports.length?`<button class="ghost-btn wide" id="copy-btn">${SVG.copy} Kunlik xulosani nusxalash</button>`:""}
@@ -271,20 +291,15 @@ async function renderAdmin(){
   }else{
     list.className="report-list";
     list.innerHTML=reports.map(r=>{
-      const o=state.open===r.deptId, alert=(r.outStock||"").trim()||(r.note||"").trim();
+      const o=state.open===r.deptId, fields=fieldsFor(r.deptId), ans=r.answers||{};
+      const alert=hasWarn(r);
+      const body=fields.map(f=>{const v=(ans[f.id]||"").trim();return v?detail(f.label,v,!!f.warn):"";}).join("");
       return `<div class="report ${o?"open":""}">
         <button class="report-top" data-d="${r.deptId}">
           <div class="report-id"><span class="report-dept">${esc(nameOf(r.deptId))}</span><span class="report-name">${esc(r.name)}</span></div>
           <div class="report-meta">${alert?`<span class="idot"></span>`:""}<span class="chev">${SVG.chev}</span></div>
         </button>
-        ${o?`<div class="report-body">
-          ${detail("Kunlik bajarilgan ishlar",r.tasks)}
-          ${(r.orders||"").trim()?detail("Buyurtmalar hisoboti",r.orders):""}
-          ${(r.topCat||"").trim()?detail("TOP kategoriyalar",r.topCat):""}
-          ${(r.top20||"").trim()?detail("Kunlik TOP mahsulotlar",r.top20):""}
-          ${(r.outStock||"").trim()?detail("Qolmagan / kam qolgan",r.outStock,true):""}
-          ${(r.note||"").trim()?detail("Izoh / muammolar",r.note):""}
-        </div>`:""}
+        ${o?`<div class="report-body">${body||`<div class="detail"><p>—</p></div>`}</div>`:""}
       </div>`;
     }).join("");
     list.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{state.open=state.open===b.dataset.d?null:b.dataset.d;haptic("light");renderAdmin();});
@@ -294,12 +309,9 @@ async function renderAdmin(){
   if(copyBtn)copyBtn.onclick=async()=>{
     let t=`📋 Qamar — kunlik hisobot\n${prettyDate(state.date)}\nTopshirdi: ${submittedCount}/${departments.length}\n\n`;
     reports.forEach(r=>{
-      t+=`▪️ ${nameOf(r.deptId)} — ${r.name}\n   Bajarilgan: ${r.tasks||"—"}\n`;
-      if((r.orders||"").trim())t+=`   Buyurtmalar: ${r.orders}\n`;
-      if((r.topCat||"").trim())t+=`   TOP kategoriya: ${r.topCat}\n`;
-      if((r.top20||"").trim())t+=`   TOP mahsulot: ${r.top20}\n`;
-      if((r.outStock||"").trim())t+=`   ⚠️ Qolmagan: ${r.outStock}\n`;
-      if((r.note||"").trim())t+=`   📝 Izoh: ${r.note}\n`;
+      const fields=fieldsFor(r.deptId), ans=r.answers||{};
+      t+=`▪️ ${nameOf(r.deptId)} — ${r.name}\n`;
+      fields.forEach(f=>{const v=(ans[f.id]||"").trim();if(v)t+=`   ${f.warn?"⚠️ ":""}${f.label}: ${v}\n`;});
       t+="\n";});
     if(missing.length)t+=`❗️ Topshirmaganlar: ${missing.map(d=>d.name).join(", ")}`;
     try{await navigator.clipboard.writeText(t.trim());copyBtn.innerHTML=`${SVG.check} Nusxa olindi`;haptic("success");setTimeout(()=>copyBtn.innerHTML=`${SVG.copy} Kunlik xulosani nusxalash`,1800);}catch(e){haptic("error");}
