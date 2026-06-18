@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { Bot, InlineKeyboard } from "grammy";
 import { db } from "./db.js";
+import { fieldsFor, FORMS } from "./forms.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +72,9 @@ app.get("/api/me", auth, (req, res) => {
 
 app.get("/api/departments", auth, (req, res) => res.json({ departments: db.getDepartments() }));
 
+// Har bir bo'lim uchun maydonlar sxemasi (interfeysni chizish uchun)
+app.get("/api/forms", auth, (req, res) => res.json({ forms: FORMS }));
+
 app.post("/api/departments", auth, adminOnly, (req, res) => {
   const list = Array.isArray(req.body.departments) ? req.body.departments : [];
   res.json({ departments: db.setDepartments(list) });
@@ -82,20 +86,21 @@ app.get("/api/report", auth, (req, res) => {
 });
 
 app.post("/api/report", auth, (req, res) => {
-  const { date, deptId, tasks, orders, topCat, top20, outStock, note } = req.body;
-  if (!date || !deptId || !tasks?.trim())
-    return res.status(400).json({ error: "Sana, bo‘lim va «Kunlik bajarilgan ishlar» majburiy." });
+  const { date, deptId, answers } = req.body;
+  if (!date || !deptId) return res.status(400).json({ error: "Sana va bo‘lim majburiy." });
+  const fields = fieldsFor(deptId);
+  const ans = {};
+  for (const f of fields) {
+    const v = (answers?.[f.id] ?? "").toString().trim();
+    if (f.required && !v) return res.status(400).json({ error: `«${f.label}» bo‘sh bo‘lmasligi kerak.` });
+    ans[f.id] = v;
+  }
   db.setUserDept(req.user.id, deptId);
   const report = {
     userId: String(req.user.id),
     name: [req.user.first_name, req.user.last_name].filter(Boolean).join(" ") || "—",
     deptId,
-    tasks: tasks.trim(),
-    orders: (orders || "").trim(),
-    topCat: (topCat || "").trim(),
-    top20: (top20 || "").trim(),
-    outStock: (outStock || "").trim(),
-    note: (note || "").trim(),
+    answers: ans,
     date, submittedAt: new Date().toISOString(),
   };
   db.saveReport(date, req.user.id, report);
