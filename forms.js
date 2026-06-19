@@ -1,99 +1,90 @@
 // forms.js — har bir bo'lim uchun hisobot maydonlari (yagona manba)
-// server.js buni shunday import qiladi:  import { fieldsFor, FORMS } from "./forms.js";
+// server.js shunday import qiladi:  import { fieldsFor, FORMS } from "./forms.js";
 //
-// Maydon turlari:
-//   "number"   — butun son (>= 0)
-//   "text"     — qisqa matn
-//   "textarea" — uzun matn / izoh
+// MUHIM: FORMS — har bir bo'lim id'siga maydonlar RO'YXATINI (array) bog'laydi.
+// Bo'lim id'lari db.js dagi id'lar bilan AYNAN bir xil bo'lishi shart!
 //
-// Yangi maydon qo'shish yoki o'zgartirish uchun shu yerni tahrirlang —
-// interfeys (index.html) ham shu tuzilmaga moslashadi.
+// Maydon xossalari:
+//   id        — noyob kalit (shu bo'lim ichida takrorlanmasin)
+//   label     — ekranda ko'rinadigan savol
+//   type      — "number" (son), "text" (qisqa matn), "textarea" (uzun matn)
+//   required  — true bo'lsa bo'sh qoldirib bo'lmaydi
+//   optional  — true bo'lsa ekranda "(ixtiyoriy)" deb ko'rsatiladi
+//   ph        — placeholder (ko'rsatma matni)
+//   rows      — textarea balandligi
+//   warn      — true: to'ldirilsa, admin panelida "ogohlantirish" sifatida belgilanadi
 
-export const FORMS = {
-  hr: {
-    title: "HR bo‘limi",
-    color: "#5b6ee1",
-    fields: [
-      { key: "late",        label: "Nechta hodim kechga qoldi?",            type: "number" },
-      { key: "on_time",     label: "Nechta hodim o‘z vaqtida keldi?",        type: "number" },
-      { key: "interviews",  label: "Nechta vakant bilan suhbat o‘tkazildi?", type: "number" },
-      { key: "note",        label: "Izoh (ixtiyoriy)",                       type: "textarea", optional: true },
-    ],
-  },
-
-  sotuv: {
-    title: "Sotuv bo‘limi",
-    color: "#2fa861",
-    fields: [
-      { key: "deals",       label: "Nechta savdo amalga oshirildi?",  type: "number" },
-      { key: "amount",      label: "Umumiy savdo summasi (so‘m)",     type: "number" },
-      { key: "new_clients", label: "Nechta yangi mijoz?",             type: "number" },
-      { key: "note",        label: "Izoh (ixtiyoriy)",                type: "textarea", optional: true },
-    ],
-  },
-
-  ombor: {
-    title: "Ombor bo‘limi",
-    color: "#d98a1f",
-    fields: [
-      { key: "out",         label: "Necha xil tovar chiqib ketdi?",     type: "number" },
-      { key: "in",          label: "Necha xil tovar keldi?",            type: "number" },
-      { key: "suppliers",   label: "Qancha ta’minotchi qabul qilindi?", type: "number" },
-      { key: "note",        label: "Izoh (ixtiyoriy)",                  type: "textarea", optional: true },
-    ],
-  },
-
-  taminot: {
-    title: "Ta’minot bo‘limi",
-    color: "#1fa6a6",
-    fields: [
-      { key: "orders",      label: "Nechta buyurtma berildi?",          type: "number" },
-      { key: "suppliers",   label: "Nechta ta’minotchi bilan ishlandi?", type: "number" },
-      { key: "amount",      label: "Umumiy xarid summasi (so‘m)",        type: "number" },
-      { key: "note",        label: "Izoh (ixtiyoriy)",                   type: "textarea", optional: true },
-    ],
-  },
-
-  call_center: {
-    title: "Call center",
-    color: "#8a5be1",
-    fields: [
-      { key: "incoming",    label: "Nechta qo‘ng‘iroq qabul qilindi?",  type: "number" },
-      { key: "outgoing",    label: "Nechta qo‘ng‘iroq amalga oshirildi?", type: "number" },
-      { key: "resolved",    label: "Nechta murojaat hal qilindi?",       type: "number" },
-      { key: "note",        label: "Izoh (ixtiyoriy)",                   type: "textarea", optional: true },
-    ],
-  },
-
-  marketing: {
-    title: "Marketing bo‘limi",
-    color: "#e15b8a",
-    fields: [
-      { key: "campaigns",   label: "Nechta reklama/kampaniya berildi?", type: "number" },
-      { key: "leads",       label: "Yangi leadlar soni",                type: "number" },
-      { key: "spend",       label: "Reklama xarajati (so‘m)",           type: "number" },
-      { key: "note",        label: "Izoh (ixtiyoriy)",                  type: "textarea", optional: true },
-    ],
-  },
-
-  b2b: {
-    title: "B2B bo‘limi",
-    color: "#3b82d9",
-    fields: [
-      { key: "meetings",    label: "Nechta korxona bilan muzokara?",  type: "number" },
-      { key: "contracts",   label: "Nechta shartnoma imzolandi?",     type: "number" },
-      { key: "amount",      label: "Umumiy summa (so‘m)",             type: "number" },
-      { key: "note",        label: "Izoh (ixtiyoriy)",                type: "textarea", optional: true },
-    ],
-  },
+// Har bo'limga qo'shiladigan umumiy "muammo/izoh" maydoni
+const MUAMMO = {
+  id: "muammo", label: "Muammolar / izoh", type: "textarea",
+  optional: true, warn: true, rows: 3, ph: "Qanday to'siqlar bo'ldi? (ixtiyoriy)",
 };
 
-// Bo'lim bo'yicha maydonlar ro'yxatini qaytaradi
-export function fieldsFor(dept) {
-  return FORMS[dept]?.fields ?? [];
-}
+export const FORMS = {
+  // 1) HR
+  hr: [
+    { id: "kech",    label: "Nechta hodim kechga qoldi?",            type: "number", required: true, ph: "0" },
+    { id: "vaqtida", label: "Nechta hodim o'z vaqtida keldi?",        type: "number", required: true, ph: "0" },
+    { id: "suhbat",  label: "Nechta vakant bilan suhbat o'tkazildi?", type: "number", required: true, ph: "0" },
+    MUAMMO,
+  ],
 
-// Bo'lim mavjudligini tekshirish uchun yordamchi
-export function isValidDept(dept) {
-  return Object.prototype.hasOwnProperty.call(FORMS, dept);
+  // 2) Sotuv bo'limi
+  sotuv: [
+    { id: "savdo",       label: "Nechta savdo amalga oshirildi?", type: "number", required: true, ph: "0" },
+    { id: "summa",       label: "Umumiy savdo summasi (so'm)",    type: "number", required: true, ph: "0" },
+    { id: "yangi_mijoz", label: "Nechta yangi mijoz?",            type: "number", required: true, ph: "0" },
+    MUAMMO,
+  ],
+
+  // 3) Ombor
+  ombor: [
+    { id: "chiqdi",     label: "Necha xil tovar chiqib ketdi?",     type: "number", required: true, ph: "0" },
+    { id: "keldi",      label: "Necha xil tovar keldi?",            type: "number", required: true, ph: "0" },
+    { id: "taminotchi", label: "Qancha ta'minotchi qabul qilindi?", type: "number", required: true, ph: "0" },
+    MUAMMO,
+  ],
+
+  // 4) Ta'minot
+  taminot: [
+    { id: "buyurtma", label: "Nechta buyurtma berildi?",           type: "number", required: true, ph: "0" },
+    { id: "hamkor",   label: "Nechta ta'minotchi bilan ishlandi?", type: "number", required: true, ph: "0" },
+    { id: "xarid",    label: "Umumiy xarid summasi (so'm)",        type: "number", required: true, ph: "0" },
+    MUAMMO,
+  ],
+
+  // 5) Call center
+  call_center: [
+    { id: "qabul",  label: "Nechta qo'ng'iroq qabul qilindi?",    type: "number", required: true, ph: "0" },
+    { id: "amalga", label: "Nechta qo'ng'iroq amalga oshirildi?", type: "number", required: true, ph: "0" },
+    { id: "hal",    label: "Nechta murojaat hal qilindi?",        type: "number", required: true, ph: "0" },
+    MUAMMO,
+  ],
+
+  // 6) Marketing
+  marketing: [
+    { id: "kampaniya", label: "Nechta reklama/kampaniya berildi?", type: "number", required: true, ph: "0" },
+    { id: "lead",      label: "Yangi leadlar soni",                type: "number", required: true, ph: "0" },
+    { id: "xarajat",   label: "Reklama xarajati (so'm)",           type: "number", required: true, ph: "0" },
+    MUAMMO,
+  ],
+
+  // 7) B2B
+  b2b: [
+    { id: "muzokara",  label: "Nechta korxona bilan muzokara?", type: "number", required: true, ph: "0" },
+    { id: "shartnoma", label: "Nechta shartnoma imzolandi?",    type: "number", required: true, ph: "0" },
+    { id: "summa",     label: "Umumiy summa (so'm)",            type: "number", required: true, ph: "0" },
+    MUAMMO,
+  ],
+
+  // Noma'lum bo'lim uchun zaxira (odatda ishlatilmaydi)
+  _default: [
+    { id: "done",   label: "Bajarilgan ishlar", type: "textarea", required: true, rows: 4, ph: "Bugun nimalar bajarildi?" },
+    MUAMMO,
+  ],
+};
+
+// Bo'lim id'si bo'yicha maydonlar ro'yxati (server ham, frontend ham shuni kutadi)
+export function fieldsFor(deptId) {
+  return FORMS[deptId] ?? FORMS._default ?? [];
 }
