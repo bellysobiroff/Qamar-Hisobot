@@ -218,6 +218,8 @@ async function renderSubmit(){
         control=`<input class="inp" id="f-${f.id}" type="number" inputmode="numeric" min="0" placeholder="${esc(f.ph||"0")}" value="${val}"/>`;
       else if(f.type==="text")
         control=`<input class="inp" id="f-${f.id}" type="text" placeholder="${esc(f.ph||"")}" value="${val}"/>`;
+      else if(f.type==="select")
+        control=`<div class="select-wrap"><select class="inp" id="f-${f.id}"><option value="" ${!answers[f.id]?"selected":""} disabled>Tanlang</option>${(f.options||[]).map(o=>`<option ${answers[f.id]===o?"selected":""}>${esc(o)}</option>`).join("")}</select><span class="select-chev">${SVG.chev}</span></div>`;
       else
         control=`<textarea class="inp area" id="f-${f.id}" rows="${f.rows||3}" placeholder="${esc(f.ph||"")}">${val}</textarea>`;
       return `<div class="card"><div class="card-head"><span class="dot ${dot}"></span> ${esc(f.label)}${opt}</div>${control}</div>`;
