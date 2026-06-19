@@ -5,15 +5,15 @@ import { dirname } from "path";
 
 const FILE = process.env.DB_FILE || "./data/db.json";
 
+// MUHIM: bu id'lar forms.js dagi FORMS kalitlari bilan AYNAN bir xil bo'lishi shart.
 const DEFAULT_DEPTS = [
-  { id: "savdo", name: "Savdo bo‘limi" },
-  { id: "marketing", name: "Marketing" },
-  { id: "moliya", name: "Moliya" },
-  { id: "ombor", name: "Ombor" },
-  { id: "hr", name: "HR" },
-  { id: "taminot", name: "Ta‘minot" },
-  { id: "ishlab", name: "Ishlab chiqarish" },
-  { id: "logistika", name: "Logistika" },
+  { id: "hr",          name: "HR" },
+  { id: "sotuv",       name: "Sotuv bo'limi" },
+  { id: "ombor",       name: "Ombor" },
+  { id: "taminot",     name: "Ta'minot" },
+  { id: "call_center", name: "Call center" },
+  { id: "marketing",   name: "Marketing" },
+  { id: "b2b",         name: "B2B" },
 ];
 
 let data = { departments: DEFAULT_DEPTS, reports: {}, users: {}, userDept: {} };
@@ -23,6 +23,10 @@ function load() {
     try { data = { departments: DEFAULT_DEPTS, reports: {}, users: {}, userDept: {}, ...JSON.parse(readFileSync(FILE, "utf8")) }; }
     catch (e) { console.error("db load error:", e.message); }
   } else { save(); }
+  // Bo'limlar ro'yxatini har doim koddan olamiz (eski db.json ni e'tiborsiz qoldiramiz),
+  // shunda forms.js bilan har doim mos bo'ladi. O'zgartirmoqchi bo'lsangiz —
+  // yuqoridagi DEFAULT_DEPTS ni va forms.js dagi kalitlarni birga tahrirlang.
+  data.departments = DEFAULT_DEPTS;
 }
 function save() {
   try {
