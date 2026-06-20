@@ -139,13 +139,54 @@ bot.command("start", async (ctx) => {
 });
 
 bot.command("help", (ctx) =>
-  ctx.reply("Hisobot topshirish uchun pastdagi menyu tugmasini yoki /start dagi tugmani bosing."));
+  ctx.reply("Hisobot topshirish uchun pastdagi menyu tugmasini bosing.\n" +
+    "Adminlar uchun: /bugun — bugungi topshirganlar ro'yxati."));
 
 /* ----------------------- Hisobot xabarnomalari ----------------------- */
 function deptName(deptId) {
   const d = db.getDepartments().find(x => x.id === deptId);
   return d ? d.name : deptId;
 }
+
+// Toshkent vaqtidagi bugungi sana (YYYY-MM-DD) — mini-ilova bilan mos bo'lishi uchun
+function todayTashkent() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" });
+}
+
+// Bugungi holat matni: kim topshirdi, kim topshirmadi
+function holatMatni(date) {
+  const departments = db.getDepartments();
+  const reports = db.getReportsForDate(date)
+    .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
+  const submittedIds = new Set(reports.map(r => r.deptId));
+  const missing = departments.filter(d => !submittedIds.has(d.id));
+
+  let msg = `📊 ${date} — kunlik holat\n`;
+  msg += `Topshirdi: ${submittedIds.size}/${departments.length}\n\n`;
+
+  msg += `✅ Topshirdi:\n`;
+  if (reports.length) {
+    for (const r of reports) {
+      msg += `  • ${deptName(r.deptId)} — ${r.name} (${fmtTime(r.submittedAt)})\n`;
+    }
+  } else {
+    msg += `  (hali hech kim)\n`;
+  }
+
+  msg += `\n❌ Topshirmadi:\n`;
+  msg += missing.length
+    ? missing.map(d => `  • ${d.name}`).join("\n")
+    : "  — hammasi topshirdi 🎉";
+  return msg;
+}
+
+// /bugun — faqat adminlar uchun
+bot.command("bugun", async (ctx) => {
+  if (!ADMIN_IDS.includes(String(ctx.from.id))) {
+    return ctx.reply("Bu buyruq faqat administrator uchun.");
+  }
+  await ctx.reply(holatMatni(todayTashkent()));
+});
 function fmtTime(iso) {
   try {
     return new Date(iso).toLocaleString("uz-UZ", {
@@ -253,6 +294,7 @@ setInterval(maybeRemind, 60 * 1000);
     }
     await bot.api.setMyCommands([
       { command: "start", description: "Boshlash / hisobot tugmasi" },
+      { command: "bugun", description: "Bugungi holat (admin)" },
       { command: "help", description: "Yordam" },
     ]);
     bot.start({ onStart: () => console.log("Bot ishga tushdi (long polling).") });
