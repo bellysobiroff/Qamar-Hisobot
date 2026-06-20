@@ -148,10 +148,15 @@ export const db = {
   // Ishga tushishda BIR MARTA chaqiriladi (server.js da await bilan)
   async init() {
     if (!SHEET_ID) throw new Error("SHEET_ID .env da korsatilmagan.");
-    const auth = new google.auth.GoogleAuth({
-      credentials: loadCredentials(),
+    const creds = loadCredentials();
+    const auth = new google.auth.JWT({
+      email: creds.client_email,
+      key: creds.private_key,
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
+    // Tokenni oldindan, aniq olib ko'ramiz (xatoni shu yerda aniq ushlash uchun)
+    await auth.authorize();
+    console.log("[diag] JWT token olindi — auth OK");
     sheets = google.sheets({ version: "v4", auth });
     await ensureTabsAndHeaders();
     await loadAll();
