@@ -1,4 +1,4 @@
-// server.js — Telegram bot + mini-app API
+// server.js — Telegram bot + mini-app API (Google Sheets bazasi bilan)
 import express from "express";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
@@ -83,7 +83,7 @@ app.get("/api/report", auth, (req, res) => {
   res.json({ report: db.getReport(date, req.user.id) });
 });
 
-app.post("/api/report", auth, (req, res) => {
+app.post("/api/report", auth, async (req, res) => {
   const { date, deptId, answers } = req.body;
   if (!date || !deptId) return res.status(400).json({ error: "Sana va bolim majburiy." });
   const fields = fieldsFor(deptId);
@@ -93,7 +93,6 @@ app.post("/api/report", auth, (req, res) => {
     if (f.required && !v) return res.status(400).json({ error: `"${f.label}" bosh bolmasligi kerak.` });
     ans[f.id] = v;
   }
-  db.setUserDept(req.user.id, deptId);
   const report = {
     userId: String(req.user.id),
     name: [req.user.first_name, req.user.last_name].filter(Boolean).join(" ") || "-",
@@ -101,9 +100,17 @@ app.post("/api/report", auth, (req, res) => {
     answers: ans,
     date, submittedAt: new Date().toISOString(),
   };
-  db.saveReport(date, req.user.id, report);
 
-  // Javobni darhol qaytaramiz, xabarlarni fonida yuboramiz (API tez ishlashi uchun).
+  // Hisobotni Sheetsga saqlaymiz (await — yozilgani tasdiqlanmaguncha kutamiz)
+  try {
+    await db.saveReport(date, req.user.id, report);
+  } catch (e) {
+    console.error("saveReport error:", e.message);
+    return res.status(500).json({ error: "Saqlashda xatolik yuz berdi. Birozdan keyin qayta urinib koring." });
+  }
+  db.setUserDept(req.user.id, deptId); // kichik ma'lumot — fonida
+
+  // Javobni qaytaramiz, keyin xabarlarni fonida yuboramiz
   res.json({ ok: true, report });
   notifyOnReport(report).catch(e => console.error("notify error:", e.message));
 });
@@ -134,13 +141,11 @@ bot.command("start", async (ctx) => {
 bot.command("help", (ctx) =>
   ctx.reply("Hisobot topshirish uchun pastdagi menyu tugmasini yoki /start dagi tugmani bosing."));
 
-/* ----------------------- Hisobot xabarnomalari (YANGI) ----------------------- */
-// Bo'lim id -> nomi
+/* ----------------------- Hisobot xabarnomalari ----------------------- */
 function deptName(deptId) {
   const d = db.getDepartments().find(x => x.id === deptId);
   return d ? d.name : deptId;
 }
-// ISO vaqtni Toshkent vaqtida soat:daqiqa qilib ko'rsatish
 function fmtTime(iso) {
   try {
     return new Date(iso).toLocaleString("uz-UZ", {
@@ -158,7 +163,7 @@ async function notifyOnReport(report) {
   const name = deptName(report.deptId);
   const time = fmtTime(report.submittedAt);
 
-  // 1) Topshiruvchiga tasdiq xabari
+  // 1) Topshiruvchiga tasdiq
   try {
     await bot.api.sendMessage(
       chatIdFor(report.userId),
@@ -172,13 +177,12 @@ async function notifyOnReport(report) {
     console.error("submitter notify error:", e.message);
   }
 
-  // 2) Adminlarga to'liq hisobot xabari
+  // 2) Adminlarga to'liq hisobot
   const fields = fieldsFor(report.deptId);
   const lines = fields
     .map(f => {
       const v = (report.answers?.[f.id] ?? "").toString().trim();
-      if (!v) return null;
-      return `• ${f.label}: ${v}`;
+      return v ? `• ${f.label}: ${v}` : null;
     })
     .filter(Boolean)
     .join("\n");
@@ -193,8 +197,7 @@ async function notifyOnReport(report) {
     (lines || "(maydonlar bo'sh)");
 
   for (const adminId of ADMIN_IDS) {
-    // Agar admin o'zi topshirgan bo'lsa, unga faqat tasdiq yetarli — takror yubormaymiz.
-    if (String(adminId) === String(report.userId)) continue;
+    if (String(adminId) === String(report.userId)) continue; // o'ziga takror yubormaymiz
     try {
       await bot.api.sendMessage(chatIdFor(adminId), adminMsg);
     } catch (e) {
@@ -229,9 +232,19 @@ async function maybeRemind() {
 setInterval(maybeRemind, 60 * 1000);
 
 /* -------------------------------- Ishga tushirish ------------------------- */
-app.listen(PORT, () => console.log(`Qamar server: http://localhost:${PORT}`));
-
 (async () => {
+  // 1) Avval bazaga ulanamiz (Sheetsdan ma'lumotlar yuklanadi)
+  try {
+    await db.init();
+  } catch (e) {
+    console.error("Bazaga ulanib bolmadi:", e.message);
+    process.exit(1);
+  }
+
+  // 2) Web-server
+  app.listen(PORT, () => console.log(`Qamar server: http://localhost:${PORT}`));
+
+  // 3) Bot
   try {
     if (MINI_APP_URL) {
       await bot.api.setChatMenuButton({
