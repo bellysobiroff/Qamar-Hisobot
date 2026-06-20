@@ -1,12 +1,11 @@
 // db.js — Google Sheets asosidagi saqlash (googleapis'siz, yengil fetch usuli)
-// Render Free muhitida googleapis ning HTTP qatlami token serveriga ulanolmagani uchun
-// (oauth2 token: Premature close), bu yerda autentifikatsiya va Sheets so'rovlari
-// to'g'ridan-to'g'ri Node ning ichki fetch'i orqali qilinadi. Qo'shimcha paket shart emas.
-//
-// Ishlash printsipi: ishga tushganda hammasi Sheetsdan xotiraga yuklanadi (init).
-// O'qishlar xotiradan (tez). Yozuvlar esa xotira + Sheetsga qo'shib boriladi.
+// Har bo'lim uchun ALOHIDA varaq: Reports_hr, Reports_sotuv, ...
+// Har varaqda o'sha bo'limning savollari alohida ustun bo'ladi.
+// Qatorning oxirida "answers_json" ustuni ham bor — qayta yuklashda shu ishlatiladi
+// (ustunlar tartibi o'zgarsa ham ma'lumot buzilmaydi).
 
 import crypto from "crypto";
+import { fieldsFor } from "./forms.js";
 
 const SHEET_ID = process.env.SHEET_ID;
 
@@ -21,14 +20,15 @@ const DEFAULT_DEPTS = [
   { id: "b2b",         name: "B2B" },
 ];
 
-const TAB_REPORTS  = "Reports";
 const TAB_USERS    = "Users";
 const TAB_USERDEPT = "UserDept";
-const HEADERS = {
-  [TAB_REPORTS]:  ["date", "userId", "name", "deptId", "submittedAt", "answers"],
-  [TAB_USERS]:    ["userId", "name", "chatId"],
-  [TAB_USERDEPT]: ["userId", "deptId"],
-};
+
+// Bo'lim -> varaq nomi va sarlavhalari
+function reportTab(deptId) { return "Reports_" + deptId; }
+function reportHeaders(deptId) {
+  return ["date", "userId", "name", "submittedAt",
+    ...fieldsFor(deptId).map(f => f.label), "answers_json"];
+}
 
 let data = { departments: DEFAULT_DEPTS, reports: {}, users: {}, userDept: {} };
 
@@ -65,7 +65,6 @@ function base64url(input) {
 }
 
 async function getAccessToken() {
-  // 60 soniya zaxira bilan keshdan beramiz
   if (accessToken && Date.now() < tokenExpiresAt - 60_000) return accessToken;
 
   const now = Math.floor(Date.now() / 1000);
@@ -158,28 +157,38 @@ async function readRange(range) {
 async function ensureTabsAndHeaders() {
   const meta = await getMeta();
   const existing = new Set((meta.sheets || []).map(s => s.properties.title));
-  const toAdd = Object.keys(HEADERS).filter(t => !existing.has(t));
+  const need = [TAB_USERS, TAB_USERDEPT, ...DEFAULT_DEPTS.map(d => reportTab(d.id))];
+  const toAdd = need.filter(t => !existing.has(t));
   if (toAdd.length) await addTabs(toAdd);
-  for (const [tab, header] of Object.entries(HEADERS)) {
-    await writeRange(`${tab}!A1`, [header]);
+
+  // Sarlavhalar (faqat 1-qatorga yoziladi — pastdagi ma'lumotга tegmaydi)
+  await writeRange(`${TAB_USERS}!A1`, [["userId", "name", "chatId"]]);
+  await writeRange(`${TAB_USERDEPT}!A1`, [["userId", "deptId"]]);
+  for (const d of DEFAULT_DEPTS) {
+    await writeRange(`${reportTab(d.id)}!A1`, [reportHeaders(d.id)]);
   }
 }
 
 async function loadAll() {
-  // --- Reports ---
   const reports = {};
-  for (const r of await readRange(`${TAB_REPORTS}!A2:Z`)) {
-    const [date, userId, name, deptId, submittedAt, answersJson] = r;
-    if (!date || !userId) continue;
-    let answers = {};
-    try { answers = answersJson ? JSON.parse(answersJson) : {}; } catch { answers = {}; }
-    if (!reports[date]) reports[date] = {};
-    const prev = reports[date][userId];
-    const rec = {
-      userId: String(userId), name: name || "-", deptId: deptId || "",
-      answers, date, submittedAt: submittedAt || "",
-    };
-    if (!prev || rec.submittedAt >= prev.submittedAt) reports[date][userId] = rec;
+  for (const d of DEFAULT_DEPTS) {
+    const fields = fieldsFor(d.id);
+    const jsonIdx = 4 + fields.length; // oxirgi ustun — answers_json
+    const rows = await readRange(`${reportTab(d.id)}!A2:Z`);
+    for (const r of rows) {
+      const date = r[0], userId = r[1], name = r[2], submittedAt = r[3];
+      if (!date || !userId) continue;
+      let answers = {};
+      const jsonCell = r[jsonIdx];
+      if (jsonCell) { try { answers = JSON.parse(jsonCell); } catch { answers = {}; } }
+      if (!reports[date]) reports[date] = {};
+      const prev = reports[date][userId];
+      const rec = {
+        userId: String(userId), name: name || "-", deptId: d.id,
+        answers, date, submittedAt: submittedAt || "",
+      };
+      if (!prev || rec.submittedAt >= prev.submittedAt) reports[date][userId] = rec;
+    }
   }
 
   // --- Users ---
@@ -212,7 +221,7 @@ export const db = {
     if (!SHEET_ID) throw new Error("SHEET_ID .env da korsatilmagan.");
     credentials = loadCredentials();
     console.log("[diag] client_email:", credentials.client_email);
-    await getAccessToken();          // tokenni shu yerda olib, xatoni aniq ushlaymiz
+    await getAccessToken();
     console.log("[diag] OAuth token olindi — auth OK");
     await ensureTabsAndHeaders();
     await loadAll();
@@ -248,14 +257,16 @@ export const db = {
   async saveReport(date, userId, report) {
     if (!data.reports[date]) data.reports[date] = {};
     data.reports[date][String(userId)] = report;
-    await appendRange(TAB_REPORTS, [[
+    const fields = fieldsFor(report.deptId);
+    const row = [
       date,
       String(userId),
       report.name || "-",
-      report.deptId || "",
       report.submittedAt || new Date().toISOString(),
+      ...fields.map(f => (report.answers?.[f.id] ?? "").toString()),
       JSON.stringify(report.answers || {}),
-    ]]);
+    ];
+    await appendRange(reportTab(report.deptId), [row]);
     return report;
   },
   getReport(date, userId) { return data.reports[date]?.[String(userId)] || null; },
