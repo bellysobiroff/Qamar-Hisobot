@@ -48,6 +48,8 @@ export const db = {
     save();
   },
   allUsers() { return Object.values(data.users); },
+  // YANGI: bitta foydalanuvchini id orqali olish (chatId ni topish uchun)
+  getUser(userId) { return data.users[String(userId)] || null; },
 
   setUserDept(userId, deptId) { data.userDept[String(userId)] = deptId; save(); },
   getUserDept(userId) { return data.userDept[String(userId)] || ""; },
