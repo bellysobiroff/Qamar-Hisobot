@@ -39,9 +39,26 @@ function loadCredentials() {
   if (b64) json = Buffer.from(b64, "base64").toString("utf8");
   else if (raw) json = raw;
   else throw new Error("GOOGLE_SERVICE_ACCOUNT_B64 (yoki GOOGLE_SERVICE_ACCOUNT) .env da korsatilmagan.");
-  const creds = JSON.parse(json);
+  let creds;
+  try {
+    creds = JSON.parse(json);
+  } catch (e) {
+    throw new Error("Credentials JSON oqilmadi (base64 buzuq bolishi mumkin): " + e.message);
+  }
   // .env orqali kelganda private_key dagi \n lar matn bolib qolishi mumkin — tiklaymiz
   if (creds.private_key) creds.private_key = creds.private_key.replace(/\\n/g, "\n");
+
+  // --- Vaqtinchalik diagnostika loglari (muammo hal bolgach ochirsa boladi) ---
+  const pk = creds.private_key || "";
+  console.log("[diag] client_email:", creds.client_email || "(YO'Q)");
+  console.log("[diag] private_key uzunligi:", pk.length);
+  console.log("[diag] private_key boshi:", JSON.stringify(pk.slice(0, 30)));
+  console.log("[diag] private_key oxiri:", JSON.stringify(pk.slice(-30)));
+  console.log("[diag] BEGIN bormi:", pk.includes("BEGIN PRIVATE KEY"));
+  console.log("[diag] END bormi:", pk.includes("END PRIVATE KEY"));
+  console.log("[diag] haqiqiy newline soni:", (pk.match(/\n/g) || []).length);
+  // ---------------------------------------------------------------------------
+
   return creds;
 }
 
