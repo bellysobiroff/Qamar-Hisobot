@@ -102,7 +102,10 @@ app.post("/api/report", auth, (req, res) => {
     date, submittedAt: new Date().toISOString(),
   };
   db.saveReport(date, req.user.id, report);
+
+  // Javobni darhol qaytaramiz, xabarlarni fonida yuboramiz (API tez ishlashi uchun).
   res.json({ ok: true, report });
+  notifyOnReport(report).catch(e => console.error("notify error:", e.message));
 });
 
 app.get("/api/admin/reports", auth, adminOnly, (req, res) => {
@@ -130,6 +133,75 @@ bot.command("start", async (ctx) => {
 
 bot.command("help", (ctx) =>
   ctx.reply("Hisobot topshirish uchun pastdagi menyu tugmasini yoki /start dagi tugmani bosing."));
+
+/* ----------------------- Hisobot xabarnomalari (YANGI) ----------------------- */
+// Bo'lim id -> nomi
+function deptName(deptId) {
+  const d = db.getDepartments().find(x => x.id === deptId);
+  return d ? d.name : deptId;
+}
+// ISO vaqtni Toshkent vaqtida soat:daqiqa qilib ko'rsatish
+function fmtTime(iso) {
+  try {
+    return new Date(iso).toLocaleString("uz-UZ", {
+      timeZone: "Asia/Tashkent", hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return new Date(iso).toISOString().slice(11, 16); }
+}
+// chatId topish: avval saqlangan chatId, bo'lmasa userId (shaxsiy chat id == user id)
+function chatIdFor(userId) {
+  const u = db.getUser(userId);
+  return u?.chatId || String(userId);
+}
+
+async function notifyOnReport(report) {
+  const name = deptName(report.deptId);
+  const time = fmtTime(report.submittedAt);
+
+  // 1) Topshiruvchiga tasdiq xabari
+  try {
+    await bot.api.sendMessage(
+      chatIdFor(report.userId),
+      "✅ Hisobotingiz qabul qilindi!\n\n" +
+      `📋 Bo'lim: ${name}\n` +
+      `📅 Sana: ${report.date}\n` +
+      `🕐 Vaqt: ${time}\n\n` +
+      "Rahmat! Ma'lumotlaringiz tizimda saqlandi."
+    );
+  } catch (e) {
+    console.error("submitter notify error:", e.message);
+  }
+
+  // 2) Adminlarga to'liq hisobot xabari
+  const fields = fieldsFor(report.deptId);
+  const lines = fields
+    .map(f => {
+      const v = (report.answers?.[f.id] ?? "").toString().trim();
+      if (!v) return null;
+      return `• ${f.label}: ${v}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  const adminMsg =
+    "📨 Yangi hisobot topshirildi\n\n" +
+    `👤 ${report.name}\n` +
+    `📋 Bo'lim: ${name}\n` +
+    `📅 Sana: ${report.date}\n` +
+    `🕐 Vaqt: ${time}\n` +
+    "————————————\n" +
+    (lines || "(maydonlar bo'sh)");
+
+  for (const adminId of ADMIN_IDS) {
+    // Agar admin o'zi topshirgan bo'lsa, unga faqat tasdiq yetarli — takror yubormaymiz.
+    if (String(adminId) === String(report.userId)) continue;
+    try {
+      await bot.api.sendMessage(chatIdFor(adminId), adminMsg);
+    } catch (e) {
+      console.error(`admin ${adminId} notify error:`, e.message);
+    }
+  }
+}
 
 /* ------------------------------ Eslatmalar ------------------------------- */
 function todayStr() {
