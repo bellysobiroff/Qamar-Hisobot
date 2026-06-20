@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "express": "^4.19.2",
+  "dependencies": {
+    "express": "^4.19.2",
     "grammy": "^1.30.0",
     "googleapis": "^144.0.0"
   }
-}
