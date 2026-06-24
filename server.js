@@ -218,7 +218,7 @@ async function notifyOnReport(report) {
     console.error("submitter notify error:", e.message);
   }
 
-  // 2) Adminlarga to'liq hisobot
+  // To'liq hisobot matni (hamma uchun bir xil)
   const fields = fieldsFor(report.deptId);
   const lines = fields
     .map(f => {
@@ -228,7 +228,7 @@ async function notifyOnReport(report) {
     .filter(Boolean)
     .join("\n");
 
-  const adminMsg =
+  const fullMsg =
     "📨 Yangi hisobot topshirildi\n\n" +
     `👤 ${report.name}\n` +
     `📋 Bo'lim: ${name}\n` +
@@ -237,12 +237,21 @@ async function notifyOnReport(report) {
     "————————————\n" +
     (lines || "(maydonlar bo'sh)");
 
-  for (const adminId of ADMIN_IDS) {
-    if (String(adminId) === String(report.userId)) continue; // o'ziga takror yubormaymiz
+  // 2) To'liq hisobotni hammaga: barcha adminlar + botni ishga tushirgan barcha foydalanuvchilar.
+  //    Topshirgan kishining o'ziga yubormaymiz (u tasdiq xabarini oldi).
+  const recipients = new Set();
+  for (const adminId of ADMIN_IDS) recipients.add(String(adminId));
+  for (const u of db.allUsers()) {
+    if (u.chatId) recipients.add(String(u.id)); // faqat /start qilganlar (chatId bor)
+  }
+  recipients.delete(String(report.userId));
+
+  for (const uid of recipients) {
     try {
-      await bot.api.sendMessage(chatIdFor(adminId), adminMsg);
+      await bot.api.sendMessage(chatIdFor(uid), fullMsg);
     } catch (e) {
-      console.error(`admin ${adminId} notify error:`, e.message);
+      // foydalanuvchi botni /start qilmagan yoki bloklagan bo'lishi mumkin
+      console.error(`notify ${uid} error:`, e.message);
     }
   }
 }
