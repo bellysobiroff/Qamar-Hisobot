@@ -12,6 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const MINI_APP_URL = process.env.MINI_APP_URL;
 const ADMIN_IDS = (process.env.ADMIN_IDS || "").split(",").map(s => s.trim()).filter(Boolean);
+const GROUP_CHAT_IDS = (process.env.GROUP_CHAT_IDS || "").split(",").map(s => s.trim()).filter(Boolean);
 const PORT = process.env.PORT || 3000;
 const REMINDER_HOUR = process.env.REMINDER_HOUR ? Number(process.env.REMINDER_HOUR) : null;
 const DEV_BYPASS = process.env.DEV_BYPASS === "1";
@@ -142,6 +143,10 @@ bot.command("help", (ctx) =>
   ctx.reply("Hisobot topshirish uchun pastdagi menyu tugmasini bosing.\n" +
     "Adminlar uchun: /bugun — bugungi topshirganlar ro'yxati."));
 
+// /id — joriy chatning ID sini ko'rsatadi (guruh ID sini bilish uchun)
+bot.command("id", (ctx) =>
+  ctx.reply(`Chat ID: ${ctx.chat.id}\nTuri: ${ctx.chat.type}`));
+
 /* ----------------------- Hisobot xabarnomalari ----------------------- */
 function deptName(deptId) {
   const d = db.getDepartments().find(x => x.id === deptId);
@@ -252,6 +257,15 @@ async function notifyOnReport(report) {
     } catch (e) {
       // foydalanuvchi botni /start qilmagan yoki bloklagan bo'lishi mumkin
       console.error(`notify ${uid} error:`, e.message);
+    }
+  }
+
+  // 3) Guruh(lar)ga ham yuboramiz
+  for (const gid of GROUP_CHAT_IDS) {
+    try {
+      await bot.api.sendMessage(gid, fullMsg);
+    } catch (e) {
+      console.error(`group ${gid} notify error:`, e.message);
     }
   }
 }
